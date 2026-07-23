@@ -2,6 +2,37 @@ import { useEffect, useState } from "react";
 import { useUser } from "@clerk/react";
 import Modal from "./Modal";
 
+// Destination is never shown in the UI.
+const FEEDBACK_TO = "jack4444baby@gmail.com";
+
+async function sendViaFormSubmit({ subject, body, replyTo }) {
+  const payload = {
+    _subject: subject,
+    message: body,
+    _template: "table",
+    _captcha: "false",
+  };
+  if (replyTo) {
+    payload._replyto = replyTo;
+    payload.replyTo = replyTo;
+  }
+
+  const response = await fetch(`https://formsubmit.co/ajax/${FEEDBACK_TO}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  const ok = data.success === true || data.success === "true";
+  if (!response.ok || !ok) {
+    throw new Error("Could not send your message. Please try again.");
+  }
+}
+
 export default function FeedbackModal({
   isOpen,
   onClose,
@@ -53,27 +84,12 @@ export default function FeedbackModal({
       user?.emailAddresses?.[0]?.emailAddress ||
       undefined;
 
-    const subjectOut = trimmedSubject || "BestPlanner feedback";
-    const bodyOut = trimmedBody || "(No message)";
-
     try {
-      const response = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subject: subjectOut,
-          body: bodyOut,
-          ...(replyTo ? { replyTo } : {}),
-        }),
+      await sendViaFormSubmit({
+        subject: trimmedSubject || "BestPlanner feedback",
+        body: trimmedBody || "(No message)",
+        replyTo,
       });
-
-      const payload = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(
-          payload.error || "Could not send your message. Please try again.",
-        );
-      }
 
       setStatus("success");
       setSubject("");

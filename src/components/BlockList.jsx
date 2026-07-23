@@ -39,6 +39,17 @@ function getBlockHeight(duration, pxPerMinute) {
   return Math.max(MIN_BLOCK_HEIGHT, Math.round(Number(duration || 0) * pxPerMinute));
 }
 
+function formatPrintDate(dateKey) {
+  if (!dateKey) return "";
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(year, month - 1, day));
+}
+
 export default function BlockList({
   blocks,
   freeBlock,
@@ -338,6 +349,7 @@ export default function BlockList({
         <div>
           <p className="eyebrow">Schedule</p>
           <h2>Block Order</h2>
+          <p className="print-schedule-date">{formatPrintDate(selectedDate)}</p>
         </div>
       </div>
 

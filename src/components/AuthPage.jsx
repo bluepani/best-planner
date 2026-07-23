@@ -1,12 +1,17 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAuth, useClerk, useSignIn, useSignUp } from "@clerk/react";
+import FeedbackModal from "./FeedbackModal";
+import {
+  markPendingSignupOnboarding,
+  setOnboardingStep,
+} from "../utils/onboarding";
 
 const BRAND_LINES = [
-  "Own your day with BestPlanner.",
+  "Own your day.",
   "Lock. In.",
   "It's time.",
-  "Build the day you meant to have.",
-  "One block at a time.",
+  "Build your day.",
+  "Block by block.",
   "Make today count.",
 ];
 
@@ -45,6 +50,19 @@ function globalError(errors) {
   return "";
 }
 
+function clerkErrorMessage(error) {
+  if (!error) return "";
+  if (typeof error === "string") return error;
+  return (
+    error.longMessage ||
+    error.message ||
+    error.errors?.[0]?.long_message ||
+    error.errors?.[0]?.longMessage ||
+    error.errors?.[0]?.message ||
+    ""
+  );
+}
+
 export default function AuthPage() {
   const { isSignedIn } = useAuth();
   const clerk = useClerk();
@@ -62,16 +80,15 @@ export default function AuthPage() {
   const [mode, setMode] = useState("sign-in");
   const [identifier, setIdentifier] = useState("");
   const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState("");
-  const [profileFile, setProfileFile] = useState(null);
-  const [profilePreview, setProfilePreview] = useState("");
   const [code, setCode] = useState("");
   const [pendingVerify, setPendingVerify] = useState(false);
   const [pendingTrust, setPendingTrust] = useState(false);
   const [formError, setFormError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [lineIndex, setLineIndex] = useState(0);
   const [turn, setTurn] = useState(0);
   const [isFlipping, setIsFlipping] = useState(false);
@@ -137,16 +154,10 @@ export default function AuthPage() {
           setTurn((current) => current + 1);
         });
       });
-    }, 3400);
+    }, 3800);
 
     return () => window.clearTimeout(hold);
   }, [lineIndex, turn, isFlipping]);
-
-  useEffect(() => {
-    return () => {
-      if (profilePreview) URL.revokeObjectURL(profilePreview);
-    };
-  }, [profilePreview]);
 
   const loading = busy || signInStatus === "fetching" || signUpStatus === "fetching";
   const isSignUp = mode === "sign-up";
@@ -168,63 +179,72 @@ export default function AuthPage() {
     if (pendingVerify) return `Enter the verification code we sent to ${email}.`;
     if (pendingTrust) return "Enter the code we emailed you to finish signing in.";
     return isSignUp
-      ? "Pick a username, add a photo, and start planning."
+      ? "Sign up with email and password to start planning."
       : "Sign in with your email or username.";
   }, [pendingVerify, pendingTrust, isSignUp, email]);
 
   if (isSignedIn) return null;
 
-  async function applyProfileImage() {
-    if (!profileFile || !clerk.user) return;
-    try {
-      await clerk.user.setProfileImage({ file: profileFile });
-    } catch {
-      // Profile image is optional — don't block sign-in if upload fails.
+  async function startSignupOnboarding() {
+    markPendingSignupOnboarding();
+    if (clerk.user) {
+      try {
+        await setOnboardingStep(clerk.user, "pay");
+      } catch {
+        // AppRouter will consume the pending flag if metadata write fails here.
+      }
     }
   }
 
-  async function finalizeNavigate({ session, decorateUrl }) {
-    if (session?.currentTask) return;
-    await applyProfileImage();
-    const url = decorateUrl("/");
-    if (url.startsWith("http")) {
-      window.location.href = url;
-    } else {
-      window.location.assign(url);
+  async function finishSignIn() {
+    const { error: finalizeError } = await signIn.finalize();
+    if (finalizeError) {
+      setFormError(
+        clerkErrorMessage(finalizeError) || "Signed in, but could not start the session.",
+      );
+      return false;
     }
+    return true;
   }
 
-  function handleProfileChange(event) {
-    const file = event.target.files?.[0];
-    if (!file) {
-      setProfileFile(null);
-      setProfilePreview("");
-      return;
+  async function finishSignUp() {
+    const { error: finalizeError } = await signUp.finalize();
+    if (finalizeError) {
+      setFormError(
+        clerkErrorMessage(finalizeError) || "Account created, but could not start the session.",
+      );
+      return false;
     }
-    if (!file.type.startsWith("image/")) {
-      setFormError("Profile picture must be an image.");
-      return;
-    }
-    if (profilePreview) URL.revokeObjectURL(profilePreview);
-    setProfileFile(file);
-    setProfilePreview(URL.createObjectURL(file));
-    setFormError("");
+    await startSignupOnboarding();
+    return true;
   }
 
   async function handleGoogle() {
     setFormError("");
     setBusy(true);
     try {
-      const { error } = await signIn.sso({
-        strategy: "oauth_google",
-        redirectUrl: "/sso-callback",
-        redirectCallbackUrl: "/sso-callback",
-      });
-      if (error) {
-        setFormError(error.message || "Google sign-in failed.");
+      if (isSignUp) {
+        markPendingSignupOnboarding();
+        const { error } = await signUp.sso({
+          strategy: "oauth_google",
+          redirectUrl: "/sso-callback",
+          redirectCallbackUrl: "/sso-callback",
+        });
+        if (error) {
+          setFormError(error.message || "Google sign-up failed.");
+        }
+      } else {
+        const { error } = await signIn.sso({
+          strategy: "oauth_google",
+          redirectUrl: "/sso-callback",
+          redirectCallbackUrl: "/sso-callback",
+        });
+        if (error) {
+          setFormError(error.message || "Google sign-in failed.");
+        }
       }
     } catch (error) {
-      setFormError(error?.message || "Google sign-in failed.");
+      setFormError(error?.message || (isSignUp ? "Google sign-up failed." : "Google sign-in failed."));
     } finally {
       setBusy(false);
     }
@@ -237,19 +257,8 @@ export default function AuthPage() {
 
     try {
       if (isSignUp) {
-        const cleanedUsername = username.trim().toLowerCase();
-        if (!cleanedUsername) {
-          setFormError("Choose a username.");
-          return;
-        }
-        if (!profileFile) {
-          setFormError("Add a profile picture to continue.");
-          return;
-        }
-
         const { error } = await signUp.password({
           emailAddress: email.trim(),
-          username: cleanedUsername,
           password,
           ...(fullName.trim()
             ? {
@@ -273,26 +282,31 @@ export default function AuthPage() {
         return;
       }
 
-      const looksLikeEmail = rawIdentifier.includes("@");
-      const { error } = await signIn.password(
-        looksLikeEmail
-          ? {
-              emailAddress: rawIdentifier.toLowerCase(),
-              password,
-            }
-          : {
-              identifier: rawIdentifier.toLowerCase(),
-              password,
-            },
-      );
+      // `identifier` accepts email or username in Clerk's future password API.
+      const { error } = await signIn.password({
+        identifier: rawIdentifier,
+        password,
+      });
       if (error) {
-        setFormError(error.message || "Could not sign in with that email/username and password.");
+        const message =
+          clerkErrorMessage(error) ||
+          "Could not sign in with that email/username and password.";
+        if (/data breach|pwned|compromised/i.test(message)) {
+          setFormError(
+            "That password was flagged as unsafe (found in a data breach). Use the new admin password or reset it in Clerk.",
+          );
+        } else {
+          setFormError(message);
+        }
         return;
       }
 
       if (signIn.status === "complete") {
-        await signIn.finalize({ navigate: finalizeNavigate });
-      } else if (signIn.status === "needs_client_trust") {
+        await finishSignIn();
+      } else if (
+        signIn.status === "needs_client_trust" ||
+        signIn.status === "needs_second_factor"
+      ) {
         const emailCodeFactor = signIn.supportedSecondFactors?.find(
           (factor) => factor.strategy === "email_code",
         );
@@ -302,10 +316,8 @@ export default function AuthPage() {
         } else {
           setFormError("Additional verification is required, but no email code option is available.");
         }
-      } else if (signIn.status === "needs_second_factor") {
-        setFormError("Multi-factor authentication is required for this account.");
       } else {
-        setFormError("Sign-in is not complete yet. Please try again.");
+        setFormError(`Sign-in is not complete yet (${signIn.status || "unknown"}). Please try again.`);
       }
     } catch (error) {
       setFormError(error?.message || "Something went wrong.");
@@ -322,7 +334,7 @@ export default function AuthPage() {
       if (pendingVerify) {
         await signUp.verifications.verifyEmailCode({ code: code.trim() });
         if (signUp.status === "complete") {
-          await signUp.finalize({ navigate: finalizeNavigate });
+          await finishSignUp();
         } else {
           setFormError("Verification incomplete. Check the code and try again.");
         }
@@ -331,7 +343,7 @@ export default function AuthPage() {
 
       await signIn.mfa.verifyEmailCode({ code: code.trim() });
       if (signIn.status === "complete") {
-        await signIn.finalize({ navigate: finalizeNavigate });
+        await finishSignIn();
       } else {
         setFormError("Verification incomplete. Check the code and try again.");
       }
@@ -364,13 +376,13 @@ export default function AuthPage() {
     setPendingVerify(false);
     setPendingTrust(false);
     setCode("");
+    setShowPassword(false);
   }
 
   const errors = isSignUp ? signUpErrors : signInErrors;
   const shownError =
     formError ||
     fieldError(errors, "emailAddress") ||
-    fieldError(errors, "username") ||
     fieldError(errors, "identifier") ||
     fieldError(errors, "password") ||
     fieldError(errors, "code") ||
@@ -386,7 +398,7 @@ export default function AuthPage() {
             className="auth-cube-stage"
             aria-live="polite"
             style={{
-              width: cubeSize.width ? `${cubeSize.width}px` : undefined,
+              width: cubeSize.width ? `min(${cubeSize.width}px, 100%)` : "100%",
               height: cubeSize.height ? `${cubeSize.height}px` : "1em",
               ["--cube-depth"]: `${Math.max((cubeSize.height || 32) / 2, 12)}px`,
             }}
@@ -451,43 +463,6 @@ export default function AuthPage() {
               <form className="auth-form" onSubmit={handlePasswordSubmit}>
                 {isSignUp ? (
                   <>
-                    <label className="profile-photo-field">
-                      <span>Profile picture</span>
-                      <div className="profile-photo-row">
-                        <div
-                          className="profile-photo-preview"
-                          style={
-                            profilePreview
-                              ? { backgroundImage: `url(${profilePreview})` }
-                              : undefined
-                          }
-                        >
-                          {!profilePreview ? "Add photo" : null}
-                        </div>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleProfileChange}
-                          required
-                        />
-                      </div>
-                    </label>
-
-                    <label className="field">
-                      <span>Username</span>
-                      <input
-                        type="text"
-                        name="username"
-                        autoComplete="username"
-                        required
-                        minLength={3}
-                        maxLength={32}
-                        value={username}
-                        onChange={(event) => setUsername(event.target.value)}
-                        placeholder="yourname"
-                      />
-                    </label>
-
                     <label className="field">
                       <span>Full name</span>
                       <input
@@ -523,23 +498,34 @@ export default function AuthPage() {
                       required
                       value={identifier}
                       onChange={(event) => setIdentifier(event.target.value)}
-                      placeholder="admin or you@example.com"
+                      placeholder="you or you@example.com"
                     />
                   </label>
                 )}
 
-                <label className="field">
+                <label className="field password-field">
                   <span>Password</span>
-                  <input
-                    type="password"
-                    name="password"
-                    autoComplete={isSignUp ? "new-password" : "current-password"}
-                    required
-                    minLength={8}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder={isSignUp ? "At least 8 characters" : "Your password"}
-                  />
+                  <div className="password-input-wrap">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      autoComplete={isSignUp ? "new-password" : "current-password"}
+                      required
+                      minLength={8}
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      placeholder={isSignUp ? "At least 8 characters" : "xyz"}
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() => setShowPassword((current) => !current)}
+                      aria-pressed={showPassword}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
                 </label>
 
                 {shownError ? <p className="auth-error">{shownError}</p> : null}
@@ -608,8 +594,25 @@ export default function AuthPage() {
               </button>
             </p>
           )}
+
+          <button
+            type="button"
+            className="auth-help-link"
+            onClick={() => setHelpOpen(true)}
+            aria-label="Help"
+          >
+            help
+          </button>
         </section>
       </div>
+
+      <FeedbackModal
+        isOpen={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        eyebrow="Support"
+        title="Help"
+        bodyPlaceholder="Describe what you need help with…"
+      />
     </div>
   );
 }

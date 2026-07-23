@@ -5,6 +5,7 @@ import CalendarView from "./components/CalendarView";
 import BlockList from "./components/BlockList";
 import Modal, { resetBodyScrollLock } from "./components/Modal";
 import NowNudge from "./components/NowNudge";
+import FeedbackButton from "./components/FeedbackButton";
 import SettingsModal, { SettingsIconButton } from "./components/SettingsModal";
 import SummaryStats from "./components/SummaryStats";
 import TypeBreakdown from "./components/TypeBreakdown";
@@ -549,9 +550,19 @@ export default function App() {
         </div>
         <div className="header-actions">
           <span className="selected-date-pill">{formatSelectedDate(selectedDate)}</span>
+          {activeTab === "planner" ? (
+            <button
+              type="button"
+              className="ghost-button no-print"
+              onClick={() => window.print()}
+              title="Print block schedule for the selected day"
+            >
+              Print
+            </button>
+          ) : null}
           <button
             type="button"
-            className={`ghost-button ${nudgeEnabled ? "toggle-on" : ""}`}
+            className={`ghost-button no-print ${nudgeEnabled ? "toggle-on" : ""}`}
             onClick={handleToggleNudge}
             aria-pressed={nudgeEnabled}
             title="Show a big reminder of the current block when you open or return to this page"
@@ -560,20 +571,25 @@ export default function App() {
           </button>
           <button
             type="button"
-            className="ghost-button"
+            className="ghost-button no-print"
             onClick={handleClearDay}
             title="Clear blocks for the selected day only"
           >
             Clear Day
           </button>
-          <SettingsIconButton onClick={() => setSettingsOpen(true)} />
-          <UserButton
-            appearance={{
-              elements: {
-                avatarBox: "user-avatar-box",
-              },
-            }}
-          />
+          <FeedbackButton />
+          <span className="no-print">
+            <SettingsIconButton onClick={() => setSettingsOpen(true)} />
+          </span>
+          <span className="no-print">
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox: "user-avatar-box",
+                },
+              }}
+            />
+          </span>
         </div>
       </header>
 

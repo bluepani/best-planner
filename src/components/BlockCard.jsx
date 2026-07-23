@@ -90,6 +90,10 @@ export default function BlockCard({
         </span>
 
         {block.overflows ? <span className="overflow-badge">Overtime</span> : null}
+
+        {block.notes?.trim() ? (
+          <p className="block-print-notes">{block.notes.trim()}</p>
+        ) : null}
       </article>
 
       <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>

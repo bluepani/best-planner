@@ -554,8 +554,8 @@ export default function App() {
     <main className="app-shell">
       <header className="app-header">
         <div>
-          <p className="eyebrow">Local block planner</p>
-          <h1>Block Day Planner</h1>
+          <p className="eyebrow">Day from time blocks</p>
+          <h1>BestPlanner</h1>
         </div>
         <div className="header-actions">
           <span className="selected-date-pill">{formatSelectedDate(selectedDate)}</span>

@@ -1,10 +1,10 @@
-# Block Day Planner
+# BestPlanner
 
 A React + Vite web app for building a day from custom movable time blocks.
 
-**Live app:** [https://colo-two.vercel.app](https://colo-two.vercel.app)
+**Live app:** [https://best-planner.vercel.app](https://best-planner.vercel.app)
 
-**Repo:** [https://github.com/bluepani/block-day-planner](https://github.com/bluepani/block-day-planner)
+**Repo:** [https://github.com/bluepani/best-planner](https://github.com/bluepani/best-planner)
 
 ## Setup
 

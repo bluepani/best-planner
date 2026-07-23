@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { UserButton } from "@clerk/react";
 import BlockForm from "./components/BlockForm";
 import CalendarView from "./components/CalendarView";
 import BlockList from "./components/BlockList";
 import Modal, { resetBodyScrollLock } from "./components/Modal";
 import NowNudge from "./components/NowNudge";
+import SettingsModal, { SettingsIconButton } from "./components/SettingsModal";
 import SummaryStats from "./components/SummaryStats";
 import TypeBreakdown from "./components/TypeBreakdown";
 import TypeEditor from "./components/TypeEditor";
@@ -18,7 +20,6 @@ import {
 } from "./utils/time";
 import {
   STORAGE_KEYS,
-  clearPlannerStorage,
   loadFromStorage,
   saveToStorage,
 } from "./utils/storage";
@@ -177,6 +178,7 @@ export default function App() {
   );
   const [nudgeOpen, setNudgeOpen] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const followedDateRef = useRef(getTodayKey());
   const nudgeReadyRef = useRef(false);
   const nudgeEnabledRef = useRef(nudgeEnabled);
@@ -527,34 +529,22 @@ export default function App() {
     persist(nextBlocks, nextSettings);
   }
 
-  function handleClearAll() {
+  function handleClearDay() {
     setClearConfirmOpen(true);
   }
 
-  function confirmClearAll() {
-    const nextSelectedDate = getTodayKey();
-    const nextDay = createBlankDay(DEFAULT_SETTINGS);
-    const nextDays = {
-      [nextSelectedDate]: nextDay,
-    };
-
-    clearPlannerStorage();
-    setPlannerState({
-      days: nextDays,
-      selectedDate: nextSelectedDate,
-    });
-    savePlannerState(nextDays, nextSelectedDate, nextDay.blocks, nextDay.settings);
+  function confirmClearDay() {
+    persist([], settings);
     setClearConfirmOpen(false);
     setNudgeOpen(false);
-    setActiveTab("planner");
-    showSavedMessage("Cleared.");
+    showSavedMessage("Cleared this day.");
   }
 
   return (
     <main className="app-shell">
       <header className="app-header">
         <div>
-          <p className="eyebrow">Day from time blocks</p>
+          <p className="eyebrow">BestPlanner</p>
           <h1>BestPlanner</h1>
         </div>
         <div className="header-actions">
@@ -568,9 +558,22 @@ export default function App() {
           >
             {nudgeEnabled ? "Nudge On" : "Nudge Off"}
           </button>
-          <button type="button" className="ghost-button" onClick={handleClearAll}>
-            Clear All
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={handleClearDay}
+            title="Clear blocks for the selected day only"
+          >
+            Clear Day
           </button>
+          <SettingsIconButton onClick={() => setSettingsOpen(true)} />
+          <UserButton
+            appearance={{
+              elements: {
+                avatarBox: "user-avatar-box",
+              },
+            }}
+          />
         </div>
       </header>
 
@@ -697,19 +700,23 @@ export default function App() {
         typeDefinitions={todayDay.settings.typeDefinitions}
       />
 
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
       <Modal isOpen={clearConfirmOpen} onClose={() => setClearConfirmOpen(false)}>
         <section
           className="block-modal confirm-modal"
           onClick={(event) => event.stopPropagation()}
           role="dialog"
           aria-modal="true"
-          aria-label="Confirm clear all"
+          aria-label="Confirm clear day"
         >
           <div className="modal-header">
             <div>
-              <p className="eyebrow">Danger zone</p>
-              <h2>Clear everything?</h2>
-              <span>This deletes all saved days, blocks, and settings. You can&apos;t undo it.</span>
+              <p className="eyebrow">Clear day</p>
+              <h2>Clear {formatSelectedDate(selectedDate)}?</h2>
+              <span>
+                This removes blocks for this day only. Other days in your calendar stay untouched.
+              </span>
             </div>
           </div>
           <div className="card-actions">
@@ -723,9 +730,9 @@ export default function App() {
             <button
               type="button"
               className="ghost-button danger-button"
-              onClick={confirmClearAll}
+              onClick={confirmClearDay}
             >
-              Yes, clear all
+              Yes, clear day
             </button>
           </div>
         </section>

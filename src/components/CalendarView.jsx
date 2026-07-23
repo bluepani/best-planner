@@ -202,6 +202,7 @@ export default function CalendarView({
                     <strong>
                       {formatTime(block.start)}-{formatTime(block.end)}
                     </strong>
+                    <small className="block-duration">{formatDuration(block.duration)}</small>
                   </div>
                   <div className="block-summary">
                     <h3>{block.label || "Untitled block"}</h3>

@@ -2,24 +2,31 @@
 
 A React + Vite web app for building a day from custom movable time blocks.
 
-**Live app:** [https://best-planner.vercel.app](https://best-planner.vercel.app)
+**Live app:** [https://best-planner-app.vercel.app](https://best-planner-app.vercel.app)
 
 **Repo:** [https://github.com/bluepani/best-planner](https://github.com/bluepani/best-planner)
 
 ## Setup
+
+1. Create a Clerk application at [dashboard.clerk.com](https://dashboard.clerk.com).
+2. Enable **Email + password** and **Google** under User & authentication / SSO.
+3. Copy the publishable key into `.env.local`:
+
+```bash
+cp .env.example .env.local
+# set VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+```
+
+4. Add your local and production URLs in Clerk (e.g. `http://localhost:5173`, `https://best-planner-app.vercel.app`).
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the localhost URL shown in the terminal.
-
 ## Deploy
 
-Production is hosted on Vercel. After the GitHub repo is connected in the Vercel project settings, pushes to `main` trigger a cloud build and production deploy.
-
-Manual production deploy from this folder:
+Set `VITE_CLERK_PUBLISHABLE_KEY` in the Vercel project environment variables, then deploy:
 
 ```bash
 npx vercel --prod
@@ -27,6 +34,7 @@ npx vercel --prod
 
 ## Features
 
+- Sign up / sign in with Google or email + password (accounts stored in Clerk).
 - Set a wake-up/start time and sleep/end time.
 - Add blocks from the Create Block popup with separate hours and minutes fields.
 - Edit block duration, category, notes, and lock status inline after the block is added.

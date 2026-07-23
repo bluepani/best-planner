@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import BlockCard from "./BlockCard";
 import {
+  formatDuration,
   formatTime,
   getProgressStatus,
   getTypeColor,
@@ -418,6 +419,9 @@ export default function BlockList({
                         <strong>
                           {formatTime(item.block.start)}-{formatTime(item.block.end)}
                         </strong>
+                        <small className="block-duration">
+                          {formatDuration(item.block.duration)}
+                        </small>
                       </div>
                       <div className="block-summary">
                         <h3>Fun Time</h3>

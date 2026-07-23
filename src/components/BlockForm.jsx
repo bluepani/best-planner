@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import Modal from "./Modal";
-import { getTypeNames } from "../utils/time";
+import { formatDuration, getTypeNames } from "../utils/time";
 
 const initialForm = {
   label: "",
@@ -28,6 +28,10 @@ export default function BlockForm({ onAdd, typeDefinitions }) {
     form.locked;
   const hoursRef = useRef(null);
   const minutesRef = useRef(null);
+  const previewMinutes = Math.max(
+    0,
+    Math.round(Number(form.hours || 0) * 60 + Number(form.minutes || 0)),
+  );
 
   function updateField(field, value) {
     setForm((current) => ({
@@ -104,117 +108,121 @@ export default function BlockForm({ onAdd, typeDefinitions }) {
           aria-modal="true"
           aria-label="Create block"
         >
-            <div className="modal-header">
-              <div>
-                <p className="eyebrow">New block</p>
-                <h2>Create Block</h2>
-              </div>
-              {isDirty ? (
-                <button type="submit" className="ghost-button">
-                  Save
-                </button>
-              ) : (
-                <button type="button" className="ghost-button" onClick={resetAndClose}>
-                  Cancel
-                </button>
-              )}
+          <div className="modal-header">
+            <div>
+              <p className="eyebrow">New block</p>
+              <h2>Create Block</h2>
             </div>
-
-            <div className="modal-grid">
-              <label className="field label-field">
-                <span>Label</span>
-                <input
-                  value={form.label}
-                  onChange={(event) => updateField("label", event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !form.hours && !form.minutes) {
-                      event.preventDefault();
-                      hoursRef.current?.focus();
-                    }
-                  }}
-                  placeholder="Physics F=MA Paper"
-                  autoFocus
-                />
-              </label>
-
-              <div className="duration-pair">
-                <label className="field duration-field">
-                  <span>Hours</span>
-                  <input
-                    ref={hoursRef}
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={form.hours}
-                    onChange={(event) => updateField("hours", event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        minutesRef.current?.focus();
-                      }
-                    }}
-                    placeholder="0"
-                  />
-                </label>
-
-                <label className="field duration-field">
-                  <span>Minutes</span>
-                  <input
-                    ref={minutesRef}
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={form.minutes}
-                    onChange={(event) => updateField("minutes", event.target.value)}
-                    placeholder="0"
-                  />
-                </label>
-              </div>
-
-              <label className="field">
-                <span>Type</span>
-                <select
-                  value={form.type}
-                  onChange={(event) => updateField("type", event.target.value)}
-                >
-                  {typeNames.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="toggle-row compact-toggle">
-                <input
-                  type="checkbox"
-                  checked={form.locked}
-                  onChange={(event) => updateField("locked", event.target.checked)}
-                />
-                <span>Locked</span>
-              </label>
-
-              <label className="field notes-field">
-                <span>Notes</span>
-                <textarea
-                  rows="4"
-                  value={form.notes}
-                  onChange={(event) => updateField("notes", event.target.value)}
-                  placeholder="Notes, reminders, or context"
-                />
-              </label>
-            </div>
-
-            {error ? <p className="inline-error">{error}</p> : null}
-
-            <div className="card-actions">
-              <button type="submit" className="primary-button">
-                Create Block
+            {isDirty ? (
+              <button type="submit" className="ghost-button">
+                Save
               </button>
+            ) : (
               <button type="button" className="ghost-button" onClick={resetAndClose}>
                 Cancel
               </button>
+            )}
+          </div>
+
+          <div className="modal-grid">
+            <label className="field label-field">
+              <span>Label</span>
+              <input
+                value={form.label}
+                onChange={(event) => updateField("label", event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !form.hours && !form.minutes) {
+                    event.preventDefault();
+                    hoursRef.current?.focus();
+                  }
+                }}
+                placeholder="Physics F=MA Paper"
+                autoFocus
+              />
+            </label>
+
+            <div className="duration-pair">
+              <label className="field duration-field">
+                <span>Hours</span>
+                <input
+                  ref={hoursRef}
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.hours}
+                  onChange={(event) => updateField("hours", event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      minutesRef.current?.focus();
+                    }
+                  }}
+                  placeholder="0"
+                />
+              </label>
+
+              <label className="field duration-field">
+                <span>Minutes</span>
+                <input
+                  ref={minutesRef}
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.minutes}
+                  onChange={(event) => updateField("minutes", event.target.value)}
+                  placeholder="0"
+                />
+              </label>
             </div>
+
+            <p className="duration-preview" aria-live="polite">
+              Length: <strong>{formatDuration(previewMinutes)}</strong>
+            </p>
+
+            <label className="field">
+              <span>Type</span>
+              <select
+                value={form.type}
+                onChange={(event) => updateField("type", event.target.value)}
+              >
+                {typeNames.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="toggle-row compact-toggle">
+              <input
+                type="checkbox"
+                checked={form.locked}
+                onChange={(event) => updateField("locked", event.target.checked)}
+              />
+              <span>Locked</span>
+            </label>
+
+            <label className="field notes-field">
+              <span>Notes</span>
+              <textarea
+                rows="4"
+                value={form.notes}
+                onChange={(event) => updateField("notes", event.target.value)}
+                placeholder="Notes, reminders, or context"
+              />
+            </label>
+          </div>
+
+          {error ? <p className="inline-error">{error}</p> : null}
+
+          <div className="card-actions">
+            <button type="submit" className="primary-button">
+              Create Block
+            </button>
+            <button type="button" className="ghost-button" onClick={resetAndClose}>
+              Cancel
+            </button>
+          </div>
         </form>
       </Modal>
     </section>
